@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StreamView — Stream Viewer & Triage Tool</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;500;600;700;800&family=Barlow+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dashjs@4.7.4/dist/dash.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack-all.js"></script>
+</head>
+<body>
+  <header id="top-bar">
+    <div class="top-bar-inner">
+      <div class="logo">StreamView</div>
+      <div class="url-group">
+        <select id="preset-select">
+          <option value="">— Preset Streams —</option>
+        </select>
+        <input type="text" id="url-input" placeholder="Enter .m3u8 or .mpd manifest URL..." spellcheck="false">
+        <button id="load-btn">Load</button>
+        <span id="format-badge" class="badge hidden"></span>
+      </div>
+      <div class="toolbar-group">
+        <button id="lock-btn" class="toolbar-btn" title="Lock/unlock layout">Unlock</button>
+        <button id="reset-layout-btn" class="toolbar-btn" title="Reset to default layout">Reset</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Video element lives here initially, gets moved into dashboard widget -->
+  <template id="video-template">
+    <video id="video-player" controls playsinline></video>
+    <div id="player-placeholder">
+      <p>Enter a manifest URL above and click <strong>Load</strong> to start.</p>
+      <p class="hint">Supports HLS (.m3u8) and DASH (.mpd) streams</p>
+    </div>
+  </template>
+
+  <main id="app">
+    <div id="dashboard" class="grid-stack"></div>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
