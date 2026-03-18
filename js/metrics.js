@@ -16,6 +16,8 @@ export class MetricsCollector {
       audioCodec: null,
       audioTracks: [],
       currentAudioTrack: null,
+      subtitleTracks: [],
+      currentSubtitleTrack: -1,
       isLive: false,
       duration: 0,
     };

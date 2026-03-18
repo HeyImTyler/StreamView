@@ -41,8 +41,50 @@ export function init(container, metrics) {
 
       <h3>Audio Tracks</h3>
       <div id="si-audio-tracks"><span class="metric-value">—</span></div>
+
+      <h3>Subtitles / Captions</h3>
+      <div class="metric-row">
+        <span class="metric-label">Track</span>
+        <select class="quality-select" id="si-subtitle-select"><option value="-1">Off</option></select>
+      </div>
+      <div id="si-subtitle-tracks"><span class="metric-value">None available</span></div>
     </div>
   `;
+
+  const subtitleSelect = container.querySelector('#si-subtitle-select');
+  subtitleSelect.addEventListener('change', () => {
+    const val = parseInt(subtitleSelect.value, 10);
+    const hls = getHlsInstance();
+    const dash = getDashInstance();
+    const trackInfo = metrics.streamInfo.subtitleTracks[val];
+    const source = trackInfo?.source;
+
+    if (source === 'native' || (!hls && !dash)) {
+      // Toggle native textTracks on the video element
+      const videoEl = document.getElementById('video-player');
+      if (videoEl) {
+        const textTracks = Array.from(videoEl.textTracks).filter(t => t.kind === 'subtitles' || t.kind === 'captions');
+        textTracks.forEach((t, i) => { t.mode = i === val ? 'showing' : 'disabled'; });
+      }
+      metrics.addEvent('SUBTITLE', val === -1 ? 'Subtitles disabled' : `Subtitle track set to ${val}`);
+    } else if (hls && source === 'hls') {
+      hls.subtitleTrack = val;
+      hls.subtitleDisplay = val >= 0;
+      metrics.addEvent('SUBTITLE', val === -1 ? 'Subtitles disabled' : `Subtitle track set to ${val}`);
+    } else if (dash) {
+      if (val >= 0) {
+        const textTracks = dash.getTracksFor('text') || [];
+        if (textTracks[val]) {
+          dash.setTextTrack(val);
+          dash.enableText(true);
+          metrics.addEvent('SUBTITLE', `Text track set to ${val}`);
+        }
+      } else {
+        dash.enableText(false);
+        metrics.addEvent('SUBTITLE', 'Text tracks disabled');
+      }
+    }
+  });
 
   const qualitySelect = container.querySelector('#si-quality-select');
   qualitySelect.addEventListener('change', () => {
@@ -106,6 +148,26 @@ export function init(container, metrics) {
       audioDiv.innerHTML = info.audioTracks.map(t =>
         `<div class="metric-row"><span class="metric-label">${t.lang}</span><span class="metric-value">${t.name}</span></div>`
       ).join('');
+    }
+
+    // Subtitle tracks
+    const subSelect = $('#si-subtitle-select');
+    const subDiv = $('#si-subtitle-tracks');
+    const currentSubVal = subSelect.value;
+    subSelect.innerHTML = '<option value="-1">Off</option>';
+    if (info.subtitleTracks && info.subtitleTracks.length > 0) {
+      info.subtitleTracks.forEach((t, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `${t.lang} — ${t.name} (${t.kind})`;
+        subSelect.appendChild(opt);
+      });
+      subSelect.value = currentSubVal;
+      subDiv.innerHTML = info.subtitleTracks.map(t =>
+        `<div class="metric-row"><span class="metric-label">${t.lang}</span><span class="metric-value">${t.name} (${t.kind})</span></div>`
+      ).join('');
+    } else {
+      subDiv.innerHTML = '<span class="metric-value">None available</span>';
     }
   });
 

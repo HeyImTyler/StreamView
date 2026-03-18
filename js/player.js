@@ -102,6 +102,9 @@ function loadHls(url, videoEl, metrics) {
       isLive: hls.levels[0]?.details?.live || false,
     });
 
+    // Collect subtitle tracks from both hls.js API and video element textTracks
+    collectSubtitleTracks(hls, videoEl, metrics);
+
     metrics.addEvent('MANIFEST', `Parsed manifest: ${data.levels.length} quality level(s)`);
     videoEl.play().catch(() => {});
   });
@@ -146,6 +149,11 @@ function loadHls(url, videoEl, metrics) {
   hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (e, data) => {
     metrics.updateStreamInfo({ currentAudioTrack: data.id });
     metrics.addEvent('AUDIO', `Audio track switched to ${data.id}`);
+  });
+
+  hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (e, data) => {
+    metrics.updateStreamInfo({ currentSubtitleTrack: data.id });
+    metrics.addEvent('SUBTITLE', `Subtitle track switched to ${data.id}`);
   });
 
   // Timed metadata (ID3 tags)
@@ -236,6 +244,22 @@ function loadDash(url, videoEl, metrics) {
       duration: player.duration() || 0,
     });
 
+    // Collect subtitle tracks from dash.js and/or video element
+    const dashTextTracks = (player.getTracksFor('text') || []).map((t, i) => ({
+      index: i,
+      name: t.labels?.[0]?.text || `Track ${i}`,
+      lang: t.lang || 'unknown',
+      kind: t.roles?.[0]?.value === 'caption' ? 'captions' : 'subtitles',
+      source: 'dash',
+    }));
+
+    if (dashTextTracks.length > 0) {
+      metrics.updateStreamInfo({ subtitleTracks: dashTextTracks });
+      metrics.addEvent('SUBTITLE', `${dashTextTracks.length} text track(s) from manifest`);
+    } else {
+      collectSubtitleTracks(null, videoEl, metrics);
+    }
+
     metrics.addEvent('MANIFEST', `DASH stream initialized: ${levels.length} quality level(s)`);
   });
 
@@ -285,6 +309,46 @@ function loadDash(url, videoEl, metrics) {
     metrics.updateBuffer({ isBuffering: false });
     metrics.addEvent('BUFFER', 'Buffer loaded — playback resumed');
   });
+}
+
+function collectSubtitleTracks(hlsOrDash, videoEl, metrics) {
+  // Collect from hls.js subtitle tracks API (separate .vtt playlists)
+  const hlsSubtitles = (hlsOrDash?.subtitleTracks || []).map((t, i) => ({
+    index: i,
+    name: t.name || `Track ${i}`,
+    lang: t.lang || 'unknown',
+    kind: t.type === 'CLOSED-CAPTIONS' ? 'captions' : 'subtitles',
+    source: 'hls',
+  }));
+
+  if (hlsSubtitles.length > 0) {
+    metrics.updateStreamInfo({ subtitleTracks: hlsSubtitles });
+    metrics.addEvent('SUBTITLE', `${hlsSubtitles.length} subtitle track(s) from manifest`);
+    return;
+  }
+
+  // Fallback: collect from video element textTracks (CEA-608/708 embedded captions)
+  function scanTextTracks() {
+    const tracks = Array.from(videoEl.textTracks || []);
+    const subs = tracks
+      .filter(t => t.kind === 'subtitles' || t.kind === 'captions')
+      .map((t, i) => ({
+        index: i,
+        name: t.label || `Track ${i}`,
+        lang: t.language || 'unknown',
+        kind: t.kind,
+        source: 'native',
+      }));
+
+    if (subs.length > 0) {
+      metrics.updateStreamInfo({ subtitleTracks: subs });
+      metrics.addEvent('SUBTITLE', `${subs.length} text track(s) detected`);
+    }
+  }
+
+  // textTracks may not be populated yet, scan after short delay and on addtrack
+  setTimeout(scanTextTracks, 1000);
+  videoEl.textTracks?.addEventListener('addtrack', scanTextTracks);
 }
 
 function wireVideoEvents(videoEl, metrics) {
